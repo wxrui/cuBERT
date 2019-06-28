@@ -17,8 +17,8 @@ namespace cuBERT {
     class Dense {
     public:
         explicit Dense(void* handle,
-                       size_t inputs,
-                       size_t units,
+                       size_t inputs_i,
+                       size_t units_i,
                        T *kernel,
                        T *bias,
                        size_t max_batch_size);
@@ -34,8 +34,8 @@ namespace cuBERT {
     private:
         void* handle;
 
-        size_t inputs;
-        size_t units;
+        const size_t inputs;
+        const size_t units;
 
         // gpu/cpu buffer
         T *kernel;

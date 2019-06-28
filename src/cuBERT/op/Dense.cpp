@@ -5,14 +5,14 @@ namespace cuBERT {
 
     template<typename T>
     Dense<T>::Dense(void* handle,
-                 size_t inputs,
-                 size_t units,
+                 size_t inputs_i,
+                 size_t units_i,
                  T *kernel,
                  T *bias,
-                 size_t max_batch_size) {
+                 size_t max_batch_size):inputs(inputs_i),units(units_i) {
         this->handle = handle;
-        this->inputs = inputs;
-        this->units = units;
+        // this->inputs = inputs;
+        // this->units = units;
 
         this->kernel = static_cast<T *>(cuBERT::malloc(sizeof(T) * inputs * units));
         cuBERT::memcpy(this->kernel, kernel, inputs * units * sizeof(T), 1);
@@ -39,6 +39,8 @@ namespace cuBERT {
     void Dense<T>::_pre_compute(size_t batch_size, T *output) {
         void* streamId = blas_get_stream(handle);
         cuBERT::memcpyAsync(output, bias, units * batch_size * sizeof(T), 3, streamId);
+        std::cout << "dense_p_c units "<< units << " &units: " << &units << std::endl;
+
     }
 
     template<typename T>
@@ -51,6 +53,7 @@ namespace cuBERT {
                            input, inputs,
                            1.f,
                            output, units);
+        std::cout << "dense_i_c units "<< units << " &units: " << &units << std::endl;
     }
 
     template class Dense<float>;

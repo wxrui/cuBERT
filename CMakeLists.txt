@@ -7,6 +7,7 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake/)
 
 option(cuBERT_ENABLE_GPU "Enable GPU support" OFF)
 option(cuBERT_ENABLE_MKL_SUPPORT "Enable Intel MKL support" OFF)
+OPTION(USE_SWIG "Enable SWIG to generate Java API" ON)
 
 find_package(Threads REQUIRED)
 
@@ -16,6 +17,10 @@ if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
     set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+endif()
+
+if(USE_SWIG)
+    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-strict-aliasing")
 endif()
 
 include(cub)
@@ -34,6 +39,33 @@ include_directories(
         # External dependencies.
         ${cub_INCLUDE_DIR}
         ${PROTOBUF_INCLUDE_DIRS})
+
+if(USE_SWIG)
+  find_package(SWIG REQUIRED)
+  find_package(Java REQUIRED)
+  find_package(JNI REQUIRED)
+  include(UseJava)
+  include(UseSWIG)
+  set(SWIG_CXX_EXTENSION "cxx")
+  set(SWIG_EXTRA_LIBRARIES "")
+  set(SWIG_JAVA_EXTRA_FILE_EXTENSIONS ".java" "JNI.java")
+  set(SWIG_MODULE_JAVA_LANGUAGE "JAVA")
+  set(SWIG_MODULE_JAVA_SWIG_LANGUAGE_FLAG "java")
+  set(CMAKE_SWIG_OUTDIR "${CMAKE_CURRENT_BINARY_DIR}/java")
+  include_directories(Java_INCLUDE_DIRS)
+  include_directories(JNI_INCLUDE_DIRS)
+  include_directories($ENV{JAVA_HOME}/include)
+  if(WIN32)
+      FILE(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bert/windows/x86_64")
+      include_directories($ENV{JAVA_HOME}/include/win32)
+  elseif(APPLE)
+      FILE(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bert/osx/x86_64")
+      include_directories($ENV{JAVA_HOME}/include/darwin)
+  else()
+      FILE(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/bert/linux/x86_64")
+      include_directories($ENV{JAVA_HOME}/include/linux)
+  endif()
+endif(USE_SWIG)
 
 # MKL Support
 if(cuBERT_ENABLE_MKL_SUPPORT)
@@ -92,6 +124,7 @@ set(SOURCE_FILES
         src/cuBERT/op_bert/BertPooler.cpp src/cuBERT/op_bert/BertPooler.cu
         src/cuBERT/op_out/AdditionalOutputLayer.cpp)
 
+
 if (cuBERT_ENABLE_GPU)
     cuda_add_library(cuBERT SHARED ${SOURCE_FILES})
     set_target_properties(cuBERT PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
@@ -101,6 +134,45 @@ else ()
 endif ()
 add_dependencies(cuBERT ${cuBERT_EXTERNAL_DEPENDENCIES})
 target_link_libraries(cuBERT tf_protos_cc ${cuBERT_EXTERNAL_LIBRARIES})
+
+
+if(USE_SWIG)
+  set_property(SOURCE swig/cuBERT.i PROPERTY CPLUSPLUS ON)
+  LIST(APPEND swig_options -package com.dtwave.aibox.alg.textanalysis.bert)
+  set_property(SOURCE swig/cuBERT.i PROPERTY SWIG_FLAGS "${swig_options}")
+  swig_add_module(cuBERT_swig java swig/cuBERT.i)
+  swig_link_libraries(cuBERT_swig cuBERT)
+  # needed to ensure Linux build does not have lib prefix specified twice, e.g. liblibcuBERT_swig
+  set_target_properties(cuBERT_swig PROPERTIES PREFIX "")
+  # needed in some versions of CMake for VS and MinGW builds to ensure output dll has lib prefix
+  set_target_properties(cuBERT_swig PROPERTIES OUTPUT_NAME "libcuBERT_swig")
+  if(WIN32)
+    if(MINGW OR CYGWIN)
+        add_custom_command(TARGET cuBERT_swig POST_BUILD
+            COMMAND "${Java_JAVAC_EXECUTABLE}" -d . java/*.java
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_SOURCE_DIR}/libcuBERT.dll" bert/windows/x86_64
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${PROJECT_SOURCE_DIR}/libcuBERT_swig.dll" bert/windows/x86_64
+            COMMAND "${Java_JAR_EXECUTABLE}" -cf cuBERTlib.jar com)
+    else()
+        add_custom_command(TARGET cuBERT_swig POST_BUILD
+            COMMAND "${Java_JAVAC_EXECUTABLE}" -d . java/*.java
+            COMMAND cp "${PROJECT_SOURCE_DIR}/Release/*.dll" bert/windows/x86_64
+            COMMAND "${Java_JAR_EXECUTABLE}" -cf cuBERTlib.jar com)
+    endif()
+  elseif(APPLE)
+    add_custom_command(TARGET cuBERT_swig POST_BUILD
+            COMMAND "${Java_JAVAC_EXECUTABLE}" -d . java/*.java
+            COMMAND cp "${PROJECT_SOURCE_DIR}/build/*.dylib" bert/osx/x86_64
+            COMMAND cp "${PROJECT_SOURCE_DIR}/build/libcuBERT_swig.jnilib" bert/osx/x86_64/libcuBERT_swig.dylib
+            COMMAND "${Java_JAR_EXECUTABLE}" -cf cuBERTlib.jar com)
+  else()
+    add_custom_command(TARGET cuBERT_swig POST_BUILD
+	    COMMAND "${Java_JAVAC_EXECUTABLE}" -d . java/*.java
+	    COMMAND cp "${PROJECT_SOURCE_DIR}/build/*.so" bert/linux/x86_64
+	    COMMAND "${Java_JAR_EXECUTABLE}" -cf cuBERTlib.jar com)
+  endif()
+endif(USE_SWIG)
+
 
 add_executable(cuBERT_benchmark benchmark/benchmark_cu.cpp)
 target_link_libraries(cuBERT_benchmark cuBERT)
