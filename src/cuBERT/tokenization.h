@@ -122,6 +122,19 @@ namespace cuBERT {
             wordpiece_tokenizer = new WordpieceTokenizer(vocab);
         }
 
+        explicit FullTokenizer(const char **vocab_list, int vocab_len, bool do_lower_case = true) {
+            vocab = new std::unordered_map<std::string, uint64_t>();
+
+            for(size_t i = 0; i < vocab_len; ++i) {
+                std::string line = *(vocab_list+i);
+                trim(line);
+                (*vocab)[line] = i;
+            }
+
+            basic_tokenizer = new BasicTokenizer(do_lower_case);
+            wordpiece_tokenizer = new WordpieceTokenizer(vocab);
+        }
+
         FullTokenizer(const FullTokenizer &other) = delete;
 
         virtual ~FullTokenizer() {
@@ -143,7 +156,7 @@ namespace cuBERT {
         }
 
         void convert_tokens_to_ids(const std::vector<std::string> &tokens, uint64_t *ids);
-
+        static void trim(std::string &s);
     private:
         std::unordered_map<std::string, uint64_t> *vocab;
         BasicTokenizer *basic_tokenizer;

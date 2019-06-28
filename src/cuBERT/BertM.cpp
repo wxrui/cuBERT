@@ -52,6 +52,49 @@ namespace cuBERT {
     }
 
     template <typename T>
+    BertM<T>::BertM(int8_t  *model_bytes,
+                       size_t byte_len,
+                       size_t max_batch_size,
+                       size_t seq_length,
+                       size_t num_hidden_layers,
+                       size_t num_attention_heads)
+            : rr(0), graph(model_bytes, byte_len), seq_length(seq_length) {
+#ifdef HAVE_CUDA
+        int count = cuBERT::get_gpu_count();
+        if (count == 0) {
+            throw std::invalid_argument("No GPU device detected");
+        }
+        std::cerr << "Found GPU count: " << count << std::endl;
+#else
+        char *cpu_models = std::getenv("CUBERT_NUM_CPU_MODELS");
+        int count = cpu_models == nullptr ? 1 : std::atoi(cpu_models);
+        std::cerr << "Found CPU CUBERT_NUM_CPU_MODELS: " << count << std::endl;
+#endif
+
+        for (int device = 0; device < count; ++device) {
+            auto start = std::chrono::high_resolution_clock::now();
+            cuBERT::set_gpu(device);
+
+            auto *bert = new Bert<T>(graph.var, max_batch_size, seq_length,
+                                     graph.vocab_size,
+                                     graph.type_vocab_size,
+                                     graph.hidden_size,
+                                     num_hidden_layers,
+                                     num_attention_heads,
+                                     graph.intermediate_size,
+                                     graph.num_labels);
+            bert_instances.push_back(bert);
+
+            mutex_instances.push_back(new std::mutex());
+
+            auto finish = std::chrono::high_resolution_clock::now();
+            std::cerr << "device setup: " << device << ". Took "
+                      << std::chrono::duration_cast<std::chrono::milliseconds>(finish - start).count()
+                      << " milliseconds." << std::endl;
+        }
+    }
+
+    template <typename T>
     BertM<T>::~BertM() {
         for (auto &bert_instance : bert_instances) {
             delete bert_instance;

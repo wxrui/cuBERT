@@ -32,6 +32,14 @@ void* cuBERT_open(const char* model_file,
                   int num_attention_heads,
                   cuBERT_ComputeType compute_type = cuBERT_COMPUTE_FLOAT);
 
+void* cuBERT_open_graph(int8_t* model_bytes,
+                  int byte_len,
+                  int max_batch_size,
+                  int seq_length,
+                  int num_hidden_layers,
+                  int num_attention_heads,
+                  cuBERT_ComputeType compute_type = cuBERT_COMPUTE_FLOAT);
+
 void cuBERT_compute(void* model,
                     int batch_size,
                     int* input_ids,
@@ -47,6 +55,8 @@ void cuBERT_close(void* model,
 /** high level API including tokenization **/
 
 void* cuBERT_open_tokenizer(const char* vocab_file, int do_lower_case = 1);
+
+void* cuBERT_init_tokenizer(const char** vocab_list, int vocab_len, int do_lower_case = 1);
 
 void cuBERT_close_tokenizer(void* tokenizer);
 

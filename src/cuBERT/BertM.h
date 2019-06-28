@@ -19,6 +19,13 @@ namespace cuBERT {
                           size_t seq_length,
                           size_t num_hidden_layers = 12,
                           size_t num_attention_heads = 12);
+                          
+        explicit BertM(int8_t *model_bytes,
+                          size_t byte_len,
+                          size_t max_batch_size,
+                          size_t seq_length,
+                          size_t num_hidden_layers = 12,
+                          size_t num_attention_heads = 12);
 
         virtual ~BertM();
 

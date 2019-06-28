@@ -12,6 +12,8 @@ namespace cuBERT {
     class Graph {
     public:
         explicit Graph(const char *filename);
+        explicit Graph(int8_t *model_bytes, size_t byte_len);
+
 
         ~Graph();
 

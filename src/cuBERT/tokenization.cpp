@@ -30,7 +30,7 @@ namespace cuBERT {
     }
 
 // trim from both ends (in place)
-    static inline void trim(std::string &s) {
+    void FullTokenizer::trim(std::string &s) {
         ltrim(s);
         rtrim(s);
     }
@@ -44,7 +44,7 @@ namespace cuBERT {
         unsigned int index = 0;
         std::string line;
         while (std::getline(file, line)) {
-            trim(line);
+            FullTokenizer::trim(line);
             (*vocab)[line] = index;
             index++;
         }

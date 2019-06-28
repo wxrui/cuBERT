@@ -39,6 +39,31 @@ void *cuBERT_open(const char *model_file,
     }
 }
 
+void *cuBERT_open_graph(int8_t *model_bytes,
+                  int byte_len,
+                  int max_batch_size,
+                  int seq_length,
+                  int num_hidden_layers,
+                  int num_attention_heads,
+                  cuBERT_ComputeType compute_type) {
+    if (compute_type == cuBERT_COMPUTE_FLOAT) {
+        return new cuBERT::BertM<float>(model_bytes,
+                                        byte_len,
+                                        max_batch_size,
+                                        seq_length,
+                                        num_hidden_layers, num_attention_heads);
+    } else {
+#ifdef HAVE_CUDA
+        return new cuBERT::BertM<half>(model_file,
+                                       max_batch_size,
+                                       seq_length,
+                                       num_hidden_layers, num_attention_heads);
+#else
+        throw std::invalid_argument("half precision not supported by CPU");
+#endif
+    }
+}
+
 void cuBERT_compute(void *model,
                     int batch_size,
                     int *input_ids,
@@ -77,6 +102,12 @@ void cuBERT_close(void *model, cuBERT_ComputeType compute_type) {
 void* cuBERT_open_tokenizer(const char* vocab_file, int do_lower_case) {
     return new cuBERT::FullTokenizer(vocab_file, do_lower_case);
 }
+
+void* cuBERT_init_tokenizer(const char** vocab_list,int vocab_len, int do_lower_case){
+    return new cuBERT::FullTokenizer(vocab_list, vocab_len, do_lower_case);
+
+}
+
 
 void cuBERT_close_tokenizer(void* tokenizer) {
     delete (cuBERT::FullTokenizer *) tokenizer;
